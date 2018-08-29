@@ -178,6 +178,7 @@
       <DependentUpon>DBModels.edmx</DependentUpon>
     </Compile>
     <Compile Include="Models\Extended\User.cs" />
+    <Compile Include="Models\ResetPasswordModel.cs" />
     <Compile Include="Models\User.cs">
       <DependentUpon>DBModels.tt</DependentUpon>
     </Compile>
@@ -243,6 +244,8 @@
     <Content Include="Views\User\Registration.cshtml" />
     <Content Include="Views\User\VerifyAccount.cshtml" />
     <Content Include="Views\User\Login.cshtml" />
+    <Content Include="Views\User\ForgotPassword.cshtml" />
+    <Content Include="Views\User\ResetPassword.cshtml" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />

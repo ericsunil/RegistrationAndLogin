@@ -163,17 +163,30 @@ namespace RegistrationAndLogin.Controllers
             }
 
         [NonAction]
-        public void SendVerificationLinkEmail(string emailID, string activationcode)
+        public void SendVerificationLinkEmail(string emailID, string activationcode, string emailFor = "VerifyAccount")
         {
-            var verifyUrl = "/User/VerifyAccount/" + activationcode;
+            var verifyUrl = "/User/"+emailFor+"/" + activationcode;
             var link = Request.Url.AbsoluteUri.Replace(Request.Url.PathAndQuery, verifyUrl);
 
-            var fromEmail = new MailAddress("abinaskosansar@gmail.com", "Sunil Hyaunmikha");
+            var fromEmail = new MailAddress("demo@gmail.com", "Lorem Ipsum");
             var toEmail = new MailAddress(emailID);
-            var fromEmailPassword = "handsome";//
-            string subject = "Your account is successfully created!";
+            var fromEmailPassword = "**********";//password of the required email address
 
-            string body = "<br><br>Your account is" + " Successfully created. Please click on the below link to verify your account " + "<br><br><a href='" + link + "'>" + link + "</a>";
+            string subject = "";
+            string body = "";
+            if (emailFor == "VerifyAccount")
+            {
+                subject = "Your account is successfully created!";
+
+                body = "<br><br>Your account is" + " Successfully created. Please click on the below link to verify your account " + "<br><br><a href='" + link + "'>" + link + "</a>";
+            }
+            else if(emailFor == "ResetPassword")
+            {
+                subject = "Reset Password";
+                body = "Hi! <br> <br>We got request for reset your account password. Please click on the link below to reset your password"+"<br><br><a href="+link+">Reset Password Link</a>";
+            }
+
+           
 
             var smtp = new SmtpClient
             {
@@ -196,5 +209,101 @@ namespace RegistrationAndLogin.Controllers
            
         }
 
+        //Forgot Password
+        public ActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        //for verifing the email id provided in FP
+        [HttpPost]
+        public ActionResult ForgotPassword(string EmailID)
+        {
+            //Verify Email ID
+            string message = "";
+            bool status = false;
+            using ( DBModel dc = new DBModel())
+            {
+                var account = dc.Users.Where(a => a.EmailID == EmailID).FirstOrDefault();
+                if(account != null)
+                {
+                    //send email for reset password
+                    string resetCode = Guid.NewGuid().ToString();
+                    SendVerificationLinkEmail(account.EmailID, resetCode, "ResetPassword");
+                    account.ResetPasswordCode = resetCode;
+
+                    //before the save data validation is dissabled.
+                    //ie. avoiding conform password doesnot match issue.
+                    dc.Configuration.ValidateOnSaveEnabled = false;
+                    dc.SaveChanges();
+                    message = "Reset Password Link has been sent to your email address.";
+
+
+                }
+                else
+                {
+                    message = "Account Not Found.";
+                }
+            }
+
+            //Generate Reset Passwort Link
+            //Send Email    
+
+            ViewBag.Message = message; 
+            return View();
+        }
+
+        public ActionResult ResetPassword(string id)
+        {
+            //verify the reset password link
+            //Find account associated with this link
+            //redirect to new   reset password page.
+
+            //first check unique id from db
+            using (DBModel dc = new DBModel())
+            {
+                var user = dc.Users.Where(a => a.ResetPasswordCode == id).FirstOrDefault();
+                //if the link is valid
+                if( user != null)
+                {
+                    ResetPasswordModel model = new ResetPasswordModel();
+                    model.ResetCode = id; //set resetcode to id
+                    return View(model);
+
+                }
+                else
+                {
+                    return HttpNotFound();
+                }
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult ResetPassword(ResetPasswordModel model)
+        {
+            var message = "";
+            if (ModelState.IsValid)
+            {
+                using (DBModel dc = new DBModel())
+                {
+                    var user = dc.Users.Where(a => a.ResetPasswordCode == model.ResetCode).FirstOrDefault();
+                    if (user != null)
+                    {
+                        user.Password = Crypto.Hash(model.NewPassword);
+                        user.ResetPasswordCode = ""; //just for single time so.
+                        dc.Configuration.ValidateOnSaveEnabled = false;
+                        dc.SaveChanges();
+                        message = "New password updated successfully";
+                    }
+                }
+            }
+            else
+            {
+                message = "Something Invalid.";
+            }
+            ViewBag.Message = message;
+            return View(model);
+        }
     }
 }
