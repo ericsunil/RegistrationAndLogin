@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Mail;
 using System.Web;
 using System.Web.Mvc;
+using System.Web.Security;
 
 namespace RegistrationAndLogin.Controllers
 {
@@ -93,10 +94,64 @@ namespace RegistrationAndLogin.Controllers
             ViewBag.Status = Status;
                 return View();
         }
-        //Verify Email Link
+
         //Login
+        [HttpGet]
+        public ActionResult Login()
+        {
+            return View();
+        }
         //Login Post
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult Login(UserLogin login, string ReturnUrl)
+        {
+            String message = "";
+            using ( DBModel dc = new DBModel())
+            {
+                var v = dc.Users.Where(a => a.EmailID == login.EmailID).FirstOrDefault();
+                if(v != null)
+                {
+                    if(String.Compare(Crypto.Hash(login.Password), v.Password ) == 0)
+                    {
+                        int timeout = login.RememberMe ? 525600 : 20; //if remember me then it should be stored for 1 yr ie 525600 min, else save for 20min
+                        var ticket = new FormsAuthenticationTicket(login.EmailID, login.RememberMe, timeout);
+                        string encrypted = FormsAuthentication.Encrypt(ticket);
+                        var cookie = new HttpCookie(FormsAuthentication.FormsCookieName, encrypted);
+                        cookie.Expires = DateTime.Now.AddMinutes(timeout);
+                        cookie.HttpOnly = true; //if doesn't want toacess it from JS.
+                        Response.Cookies.Add(cookie);
+
+                        if (Url.IsLocalUrl(ReturnUrl))
+                        {
+                            return Redirect(ReturnUrl);
+                        }
+                        else
+                        {
+                            return RedirectToAction("Index", "Home");
+                        }
+                    }
+                    else
+                    {
+                        message = "Invalid Credental Provided";
+                    }
+                }
+                else
+                {
+                    message = "Invalid Credental Provided";
+                }
+            }
+                ViewBag.Message = message;
+            return View();
+        }
         //Logout
+        [Authorize]
+        [HttpPost]
+        public ActionResult Logout()
+        {
+            FormsAuthentication.SignOut();
+            return RedirectToAction("Login", "User");
+        }
         [NonAction]
         public bool IsEmailExist(string emailID)
             {
